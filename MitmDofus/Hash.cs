@@ -54,5 +54,23 @@ namespace MitmDofus
 
             throw new IndexOutOfRangeException(ch + " is not in the hash table.");
         }
+
+        public static short Get_Cell_From_Hash(string cellHash)
+        {
+            char char1 = cellHash[0], char2 = cellHash[1];
+            short code1 = 0, code2 = 0, a = 0;
+
+            while (a < CharsArray.Length)
+            {
+                if (CharsArray[a] == char1)
+                    code1 = (short)(a * 64);
+
+                if (CharsArray[a] == char2)
+                    code2 = a;
+
+                a++;
+            }
+            return (short)(code1 + code2);
+        }
     }
 }

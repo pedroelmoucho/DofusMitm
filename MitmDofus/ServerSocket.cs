@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -14,6 +16,9 @@ namespace MitmDofus
         private Socket SocketClient { get; set; }
         private byte[] BufferServer { get; set; }
         private byte[] BufferClient { get; set; }
+        private bool IsInFight = false;
+        private int CharacterId = 0;
+        private ConcurrentDictionary<int, int> MonstersCells = new ConcurrentDictionary<int, int>();
 
         public ServerSocket (Socket socket, string ip)
         {
@@ -72,13 +77,72 @@ namespace MitmDofus
                 foreach (var packet in datas.Replace("\x0a", string.Empty).Split('\0').Where(x => x != string.Empty))
                 {
                     Console.WriteLine("SMSG " + packet);
-
-                    if (packet.StartsWith("AXK"))
-                        Console.WriteLine(Hash.DecryptIp(packet.Substring(3, 8)) + " " + Hash.DecryptPort(packet.Substring(11, 3).ToCharArray()));
-                    if (packet.StartsWith("SL") && packet[2] != 'o')
+                    if (packet.StartsWith("ASK"))
                     {
-                        Console.WriteLine("Spells");
-                        datas = datas.Replace("~1~", "~6~");
+                        string[] splittedData = packet.Substring(4).Split('|');
+                        CharacterId = int.Parse(splittedData[0]);
+                    }
+                    if (packet.StartsWith("GJK"))
+                    {
+                        IsInFight = true;
+                        MonstersCells = new ConcurrentDictionary<int, int>();
+                        Debug.WriteLine("Fight start");
+                        Debug.WriteLine("join fight");
+                        SocketClient.Send(Encoding.UTF8.GetBytes("GA903" + CharacterId + ";" + CharacterId + "\n\x00"));
+                        SocketClient.Send(Encoding.UTF8.GetBytes("GA903" + CharacterId + ";" + CharacterId + "\n\x00"));
+                    }  
+                    if (packet.StartsWith("GE"))
+                    {
+                        IsInFight = false;
+                        Debug.WriteLine("Fight end");
+                    }
+                    if (packet.StartsWith("GA") && !packet.StartsWith("GAS") && !packet.StartsWith("GAF"))
+                    {
+                        string[] splittedData = packet.Substring(2).Split(';');
+                        int actionId = int.Parse(splittedData[1]);
+                        if (actionId > 0)
+                        {
+                            switch(actionId)
+                            {
+                                case 1:
+                                    int entityId = int.Parse(splittedData[2]);
+                                    Debug.WriteLine("Entity at : " + Hash.Get_Cell_From_Hash(splittedData[3].Substring(splittedData[3].Length - 2)));
+                                    MonstersCells[entityId] = Hash.Get_Cell_From_Hash(splittedData[3].Substring(splittedData[3].Length - 2));
+                                    break;
+                                case 5:
+                                    splittedData = splittedData[3].Split(',');
+                                    Debug.WriteLine("Entity at : " + int.Parse(splittedData[1]));
+                                    MonstersCells[int.Parse(splittedData[0])] = int.Parse(splittedData[1]);
+                                    break;
+                                case 103:
+                                    Debug.WriteLine("Entity dead");
+                                    MonstersCells.TryRemove(int.Parse(splittedData[3]), out int test);
+                                    break;
+                            }
+                        }
+                    }
+                    if (packet.StartsWith("GTS"))
+                    {
+                        Debug.WriteLine("Turn start");
+                        foreach (var key in MonstersCells.Keys)
+                        {
+                            if (key != CharacterId && int.Parse(packet.Substring(3).Split('|')[0]) == CharacterId)
+                            {
+                                Debug.WriteLine("cast spell " + "GA300167;" + MonstersCells[key]);
+                                Console.WriteLine("GA300167;" + MonstersCells[key]);
+                                SocketClient.Send(Encoding.UTF8.GetBytes("GA300167;" + MonstersCells[key] + "\n\x00"));
+                            } else if ((key == CharacterId) && int.Parse(packet.Substring(3).Split('|')[0]) == CharacterId)
+                            {
+                                Debug.WriteLine("cast spell " + "GA300172;" + MonstersCells[key]);
+                                Console.WriteLine("GA300172;" + MonstersCells[key]);
+                                SocketClient.Send(Encoding.UTF8.GetBytes("GA300172;" + MonstersCells[key] + "\n\x00"));
+                            }
+                        }
+                    }
+                    if (packet.StartsWith("Gt"))
+                    {
+                        Debug.WriteLine("join fight");
+                        SocketClient.Send(Encoding.UTF8.GetBytes("GA903" + CharacterId + ";" + CharacterId + "\n\x00"));
                     }
                 }
 

@@ -43,7 +43,6 @@ namespace MitmDofus
 
                     // Wait until a connection is made before continuing.  
                     allDone.WaitOne();
-                    connNumber++;
                 }
                 Console.WriteLine("Press enter to relaunch the server");
             }
@@ -68,6 +67,7 @@ namespace MitmDofus
                 new ServerSocket(handler, "34.251.172.139");
             else
                 new ServerSocket(handler, "52.17.83.159");
+            connNumber++;
         }
     }
 }
